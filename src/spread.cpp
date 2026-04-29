@@ -41,22 +41,6 @@ auto last = std::chrono::steady_clock::now();
 #define DEBUG_CONSOLE(...) LOG_CONSOLE(PLID, __VA_ARGS__)
 #define LOG_FILE(msg) (this->LogToFile(msg))
 
-// Horizontal movement threshold.
-// 1.0f is usually enough to ignore tiny physics jitter while still
-// detecting real movement immediately.
-#define MOVEMENT_EPSILON 3.0f
-
-#define HAS_NO_VELOCITY_2D(speed2D) \
-    ((speed2D) < MOVEMENT_EPSILON)
-
-#define HAS_VELOCITY_2D(speed2D) \
-    ((speed2D) >= MOVEMENT_EPSILON)
-
-// ReGameDLL increments m_iShotsFired before spread calculation,
-// therefore first bullet == 1, not 0.
-#define IS_FIRST_SHOT(pWeapon) \
-    ((pWeapon)->m_iShotsFired == 1)
-
 void CSpread::LogToFile(const std::string& message) {
 
 	if (this->m_logFile.is_open())
@@ -112,6 +96,22 @@ void CSpread::SetupLog()
 #define IS_STANDING(flags) (!((flags) & FL_DUCKING))
 //#define IS_ON_GROUND(flags) ((flags)&FL_ONGROUND)
 #define IS_AIRBORNE(flags) (!((flags) & FL_ONGROUND))
+
+// Horizontal movement threshold.
+// 1.0f is usually enough to ignore tiny physics jitter while still
+// detecting real movement immediately.
+#define MOVEMENT_EPSILON 3.0f
+
+#define HAS_NO_VELOCITY_2D(speed2D) \
+    ((speed2D) < MOVEMENT_EPSILON)
+
+#define HAS_VELOCITY_2D(speed2D) \
+    ((speed2D) >= MOVEMENT_EPSILON)
+
+// ReGameDLL increments m_iShotsFired before spread calculation,
+// therefore first bullet == 1, not 0.
+#define IS_FIRST_SHOT(pWeapon) \
+    ((pWeapon)->m_iShotsFired == 1)
 
 FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer*, bool, float);
 
