@@ -305,7 +305,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 #ifdef DO_DEBUG
 			sc_DeadCenter += 1;
 #endif
-			DEBUG_CONSOLE("[%s] (first shot dead center) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, 0.0f);
+			//DEBUG_CONSOLE("[%s] (first shot dead center) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, 0.0f);
 			return 0.0f;
 		}
 
@@ -349,7 +349,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 #endif
 				if (weaponCfg.StandingStill >= 0.0f)
 				{
-					DEBUG_CONSOLE("[%s] (still, standing) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, vecSpread * weaponCfg.StandingStill);
+					//DEBUG_CONSOLE("[%s] (still, standing) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, vecSpread * weaponCfg.StandingStill);
 					return vecSpread * weaponCfg.StandingStill;
 				}
 
