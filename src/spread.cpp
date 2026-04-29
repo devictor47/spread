@@ -41,6 +41,22 @@ auto last = std::chrono::steady_clock::now();
 #define DEBUG_CONSOLE(...) LOG_CONSOLE(PLID, __VA_ARGS__)
 #define LOG_FILE(msg) (this->LogToFile(msg))
 
+// Horizontal movement threshold.
+// 1.0f is usually enough to ignore tiny physics jitter while still
+// detecting real movement immediately.
+#define MOVEMENT_EPSILON 3.0f
+
+#define HAS_NO_VELOCITY_2D(speed2D) \
+    ((speed2D) < MOVEMENT_EPSILON)
+
+#define HAS_VELOCITY_2D(speed2D) \
+    ((speed2D) >= MOVEMENT_EPSILON)
+
+// ReGameDLL increments m_iShotsFired before spread calculation,
+// therefore first bullet == 1, not 0.
+#define IS_FIRST_SHOT(pWeapon) \
+    ((pWeapon)->m_iShotsFired == 1)
+
 void CSpread::LogToFile(const std::string& message) {
 
 	if (this->m_logFile.is_open())
@@ -53,13 +69,29 @@ void CSpread::SetupLog()
 	std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
 	std::string nowStr(std::ctime(&now_time_t));
 
+	const std::string dir = "cstrike/addons/spread";
+	const std::string file = dir + "/spread_log.txt";
+
 	if (!this->m_logFile.is_open())
 	{
-		this->m_logFile.open("cstrike/addons/spread/spread_log.txt", std::ios::app);
+		this->m_logFile.open(file, std::ios::app);
 
-		if (!this->m_logFile) {
+		// Failed? Try creating directory and reopening.
+		if (!this->m_logFile)
+		{
+			this->m_logFile.open("cstrike/addons/spread_log.txt", std::ios::app);
+
+			// Clear stream state before retrying.
+			this->m_logFile.clear();
+
+			this->m_logFile.open(file, std::ios::app);
+		}
+
+		if (!this->m_logFile)
+		{
 			LOG_ERROR(PLID, "ERROR OPENING SPREAD LOG FILE");
 			LOG_CONSOLE(PLID, "ERROR OPENING SPREAD LOG FILE");
+			return;
 		}
 
 		LOG_FILE("Log Started - " + nowStr);
@@ -78,10 +110,10 @@ void CSpread::SetupLog()
 #endif
 
 #define IS_STANDING(flags) (!((flags) & FL_DUCKING))
-#define IS_ON_GROUND(flags) ((flags) & FL_ONGROUND)
+//#define IS_ON_GROUND(flags) ((flags)&FL_ONGROUND)
 #define IS_AIRBORNE(flags) (!((flags) & FL_ONGROUND))
 
-FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer*, bool);
+FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer*, bool, float);
 
 bool CSpread::RegisterCvar()
 {
@@ -133,8 +165,9 @@ void CSpread::SetWeapon()
 		{
 			auto slot = g_ReGameApi->GetWeaponSlot(weaponName.c_str());
 
-			if (slot->slot == PRIMARY_WEAPON_SLOT ||
-				slot->slot == PISTOL_SLOT)
+			if (slot &&
+				(slot->slot == PRIMARY_WEAPON_SLOT ||
+				slot->slot == PISTOL_SLOT))
 			{
 				gSpread.AddWeapon(slot->id,
 					std::stof(g_engfuncs.pfnCmd_Argv(2)),  // InAir
@@ -160,32 +193,25 @@ void CSpread::SetWeapon()
 
 void CSpread::AddWeapon(int WeaponIndex, float InAir, float MovingStanding, float MovingDucking, float StandingStill, float DuckingStill, float Default)
 {
-	this->m_rgWeaponsCfg[WeaponIndex] =
-	WEAPON_SPREAD_CFG {
-		true,
-		InAir,
-		MovingStanding,
-		MovingDucking,
-		StandingStill,
-		DuckingStill,
-		Default
-	};
-}
+	if (WeaponIndex >= 0 && WeaponIndex < MAX_WEAPONS) {
 
-void tests()
-{
-	edict_t* pEdict = g_engfuncs.pfnPEntityOfEntIndex(1);
-	CBasePlayer* pPlayer = static_cast<CBasePlayer*>(pEdict->pvPrivateData);
-	g_ReGameApi->GetGameRules()->ChangePlayerTeam(pPlayer, "SPECTATOR", TRUE, TRUE);
-	
+		this->m_rgWeaponsCfg[WeaponIndex] =
+			WEAPON_SPREAD_CFG{
+				true,
+				InAir,
+				MovingStanding,
+				MovingDucking,
+				StandingStill,
+				DuckingStill,
+				Default
+		};
+	}
 }
 
 float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 {
 
 #ifdef DO_DEBUG	
-
-	//tests();
 
 	// Log every 30 seconds.
 	if (std::chrono::duration<double>(std::chrono::steady_clock::now() - last).count() > 30)
@@ -247,13 +273,18 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 
 	// See if current player weapon is configured.
 	const int wepId = pPlayer->m_pActiveItem->m_iId;
-	WEAPON_SPREAD_CFG weaponCfg = this->m_rgWeaponsCfg[wepId];
+
+	if (wepId < 0 || wepId >= MAX_WEAPONS)
+		return vecSpread;
+
+	const WEAPON_SPREAD_CFG weaponCfg = this->m_rgWeaponsCfg[wepId];
 	
 	if (!weaponCfg.IsValid)
 		return vecSpread;
 
 	const int flags = pPlayer->pev->flags;
 	const auto pev = pPlayer->pev;
+	const float speed2D = pev->velocity.Length2D();
 
 	// Player is in the air.
 	if (IS_AIRBORNE(flags))
@@ -269,17 +300,17 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 	}
 	else
 	{
-#ifdef DO_DEBUG
-		sc_DeadCenter += 1;
-#endif
-		if (ShouldForceDeadCenterShot(pPlayer, this->m_pDeadCenterFirstShotCvar->value > 0.0f))
+		if (ShouldForceDeadCenterShot(pPlayer, this->m_pDeadCenterFirstShotCvar->value > 0.0f, speed2D))
 		{
-			//DEBUG_CONSOLE("[%s] (first shot dead center) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, 0.0f);
+#ifdef DO_DEBUG
+			sc_DeadCenter += 1;
+#endif
+			DEBUG_CONSOLE("[%s] (first shot dead center) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, 0.0f);
 			return 0.0f;
 		}
 
 		// If the player has any *horizontal* movement at all...
-		if (!pev->velocity.IsZero())
+		if (HAS_VELOCITY_2D(speed2D))
 		{
 			// Player is standing.
 			if (IS_STANDING(flags))
@@ -318,7 +349,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 #endif
 				if (weaponCfg.StandingStill >= 0.0f)
 				{
-					//DEBUG_CONSOLE("[%s] (still, standing) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, vecSpread * weaponCfg.StandingStill);
+					DEBUG_CONSOLE("[%s] (still, standing) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, vecSpread * weaponCfg.StandingStill);
 					return vecSpread * weaponCfg.StandingStill;
 				}
 
@@ -357,7 +388,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 	return vecSpread;
 }
 
-FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer* pPlayer, bool firstShotDeadCenter)
+FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer* pPlayer, bool firstShotDeadCenter, float speed2D)
 {
 	// SCOPE WEAPONS CONSIDERATIONS:
 	// AWP, SCOUT
@@ -375,48 +406,30 @@ FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer* pPlayer, bool firstShot
 	// For both of these, punchangle is also always zero, even if holding mouse button.
 	// 
 	//   AUG & SG552 WITH ZOOM      -> dead center on first shot, if cvar set.
-	//   AUG & SG552 WITHOUT ZOOM   -> never force dead center, just mitigate the resulting spread, if configured,
-	//                                 even though the original game does not change spread for these weapons
-	//                                 when not zooming, only the time between shots.
+	//   AUG & SG552 WITHOUT ZOOM   -> allow dead center regardless of zooming situation.
 
-	const auto pev = pPlayer->pev;
+	if (!firstShotDeadCenter)
+		return false;
 
-	if (firstShotDeadCenter &&
-		pev->punchangle.IsZero())
+	CBasePlayerWeapon* pWeapon =
+		static_cast<CBasePlayerWeapon*>(pPlayer->m_pActiveItem);
+
+	if (!IS_FIRST_SHOT(pWeapon))
+		return false;
+
+	if (!HAS_NO_VELOCITY_2D(speed2D))
+		return false;
+
+	switch (pWeapon->m_iId)
 	{
-		bool hasActiveZoom = false;
-
-		switch (pPlayer->m_pActiveItem->m_iId)
-		{
 		case WEAPON_AWP:
 		case WEAPON_SCOUT:
-			hasActiveZoom = pPlayer->m_bResumeZoom;
-			break;
-
 		case WEAPON_SG550:
 		case WEAPON_G3SG1:
-			hasActiveZoom = pev->fov != DEFAULT_FOV;
-			break;
+			// Scoped weapons require active zoom.
+			return pPlayer->pev->fov != DEFAULT_FOV;
 
 		default:
-
-			if (pev->velocity.Length2D() < (pPlayer->m_pActiveItem->GetMaxSpeed() / 2))
-			{
-				//DEBUG_CONSOLE( "[%s] (no scope) Dead center first shot!", __FUNCTION__);
-				return true;
-			}
-
-			return false;
-		}
-
-		if (hasActiveZoom && pev->velocity.IsZero())
-		{
-			//DEBUG_CONSOLE("[%s] (scoped) Dead center first shot!", __FUNCTION__);
 			return true;
-		}
-
-		return false;				
 	}
-
-	return false;
 }
