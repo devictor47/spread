@@ -35,7 +35,7 @@ $hldsPort = 27015
 $hldsParam = "-console -game cstrike -port $hldsPort -pingboost 3 -steam -master -secure -bots -timeout 3 +ip $hldsIP +map de_nuke +maxplayers 32 +sys_ticrate 1000";
 
 # DLL Path
-$dllPath = "$hldsPath\cstrike\addons\$pluginName";
+$dllPath = "$hldsPath\cstrike\addons\spread\$($pluginName)_mm.dll";
 
 # Resolve path of release dll
 $releaseDLL = (Resolve-Path($releaseDLL)).Path;
