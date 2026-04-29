@@ -124,6 +124,7 @@
     <ClInclude Include="regame_api_plugin.h" />
     <ClInclude Include="rehlds_api_plugin.h" />
     <ClInclude Include="spread.h" />
+    <ClInclude Include="wrapper_meta_api.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
