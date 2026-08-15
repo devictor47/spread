@@ -2,6 +2,7 @@
 #include "regame_api_plugin.h"
 #include "rehlds_api_plugin.h"
 #include <chrono>
+#include <cmath>
 #include <ctime>
 
 #ifndef _WIN32
@@ -120,34 +121,44 @@ bool CSpread::RegisterCvar()
 	char cmd_name[] = "spread_wpn";
 	g_engfuncs.pfnAddServerCommand(cmd_name, this->SetWeapon);
 
-	const char* cvarName = "spread_deadCenterFirstShot";
-	cvar_t* cvarPtr = CVAR_GET_POINTER(cvarName);
-	if (!cvarPtr)
-	{
-		// Defines whether the first shot is always dead center when standing or ducking, but not moving.
-		cvar_t CvarData;
-		char str_val[] = "0";
-		CvarData = { cvarName, str_val, 0, 0.0f, NULL };
-		CVAR_REGISTER(&CvarData);
-		cvarPtr = CVAR_GET_POINTER(cvarName);
+	if (!CVAR_GET_POINTER(m_DeadCenterFirstShotCvar.name))
+		CVAR_REGISTER(&m_DeadCenterFirstShotCvar);
 
-		if (cvarPtr) {
-			this->m_pDeadCenterFirstShotCvar = cvarPtr;
-		}
-		else {
-			LOG_ERROR(PLID, "Failed to register \"%s\" cvar: an error occurred!", cvarName);
-			LOG_CONSOLE(PLID, "Failed to register \"%s\" cvar: an error occurred!", cvarName);
-			this->m_pDeadCenterFirstShotCvar = NULL;
-			return false;
-		}
+	m_pDeadCenterFirstShotCvar = CVAR_GET_POINTER(m_DeadCenterFirstShotCvar.name);
+	if (!m_pDeadCenterFirstShotCvar)
+	{
+		LOG_ERROR(PLID, "Failed to register \"%s\" cvar.", m_DeadCenterFirstShotCvar.name);
+		return false;
 	}
-	else {
-		LOG_ERROR(PLID, "Failed to register \"%s\" cvar: already exists!", cvarName);
-		LOG_CONSOLE(PLID, "Failed to register \"%s\" cvar: already exists!", cvarName);
+
+	if (!CVAR_GET_POINTER(m_RecoilMultiplierCvar.name))
+		CVAR_REGISTER(&m_RecoilMultiplierCvar);
+
+	m_pRecoilMultiplierCvar = CVAR_GET_POINTER(m_RecoilMultiplierCvar.name);
+	if (!m_pRecoilMultiplierCvar)
+	{
+		LOG_ERROR(PLID, "Failed to register \"%s\" cvar.", m_RecoilMultiplierCvar.name);
 		return false;
 	}
 
 	return true;
+}
+
+float CSpread::GetRecoilMultiplier() const
+{
+	if (!m_pRecoilMultiplierCvar)
+		return 1.0f;
+
+	const float recoilPercent = m_pRecoilMultiplierCvar->value;
+	if (!std::isfinite(recoilPercent))
+		return 1.0f;
+
+	if (recoilPercent <= 0.0f)
+		return 0.0f;
+	if (recoilPercent >= 100.0f)
+		return 1.0f;
+
+	return recoilPercent / 100.0f;
 }
 
 void CSpread::SetWeapon()
@@ -300,7 +311,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 	}
 	else
 	{
-		if (ShouldForceDeadCenterShot(pPlayer, this->m_pDeadCenterFirstShotCvar->value > 0.0f, speed2D))
+		if (ShouldForceDeadCenterShot(pPlayer, this->m_pDeadCenterFirstShotCvar && this->m_pDeadCenterFirstShotCvar->value > 0.0f, speed2D))
 		{
 #ifdef DO_DEBUG
 			sc_DeadCenter += 1;

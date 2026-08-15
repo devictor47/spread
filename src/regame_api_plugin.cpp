@@ -10,6 +10,7 @@ IReGameApi* g_ReGameApi;
 const ReGameFuncs_t* g_ReGameFuncs;
 IReGameHookchains* g_ReGameHookchains;
 CGameRules* g_pGameRules = nullptr;
+static bool g_ReGameHooksRegistered = false;
 
 static bool regamedll_api_init()
 {
@@ -89,18 +90,20 @@ static bool regamedll_api_init()
 
 	g_ReGameHookchains->InstallGameRules()->registerHook(InstallGameRules);
 	g_ReGameHookchains->CBaseEntity_FireBullets3()->registerHook(HookFireBullets3);
-	//g_ReGameHookchains->CBasePlayerWeapon_KickBack()->registerHook(HookKickBack);
+	g_ReGameHookchains->CBasePlayerWeapon_KickBack()->registerHook(HookKickBack);
+	g_ReGameHooksRegistered = true;
 
 	return true;
 }
 
 static bool regamedll_api_stop()
 {
-	if (g_pGameRules)
+	if (g_ReGameHooksRegistered)
 	{
 		g_ReGameHookchains->InstallGameRules()->unregisterHook(InstallGameRules);
 		g_ReGameHookchains->CBaseEntity_FireBullets3()->unregisterHook(HookFireBullets3);
-		//g_ReGameHookchains->CBasePlayerWeapon_KickBack()->unregisterHook(HookKickBack);
+		g_ReGameHookchains->CBasePlayerWeapon_KickBack()->unregisterHook(HookKickBack);
+		g_ReGameHooksRegistered = false;
 	}
 
 	return true;
@@ -125,11 +128,24 @@ CGameRules* InstallGameRules(IReGameHook_InstallGameRules* chain)
 
 void HookKickBack(IReGameHook_CBasePlayerWeapon_KickBack* chain, CBasePlayerWeapon* pEntity, float up_base, float lateral_base, float up_modifier, float lateral_modifier, float up_max, float lateral_max, int direction_change)
 {
+	if (!pEntity || !pEntity->pev || !pEntity->pev->owner || !(pEntity->pev->owner->v.flags & FL_CLIENT))
+	{
+		chain->callNext(pEntity, up_base, lateral_base, up_modifier, lateral_modifier, up_max, lateral_max, direction_change);
+		return;
+	}
+
+	entvars_t* const owner = &pEntity->pev->owner->v;
+	const Vector punchAngleBefore = owner->punchangle;
 	chain->callNext(pEntity, up_base, lateral_base, up_modifier, lateral_modifier, up_max, lateral_max, direction_change);
 
-	//pEntity->pev->owner->v.punchangle.x *= 0.5;
-	//pEntity->pev->owner->v.punchangle.y *= 0.5;
-	//pEntity->pev->owner->v.punchangle.z *= 0.5;
+	const float multiplier = gSpread.GetRecoilMultiplier();
+	if (multiplier >= 1.0f)
+		return;
+
+	// Scale only this shot's kick, preserving recoil accumulated before KickBack.
+	owner->punchangle.x = punchAngleBefore.x + (owner->punchangle.x - punchAngleBefore.x) * multiplier;
+	owner->punchangle.y = punchAngleBefore.y + (owner->punchangle.y - punchAngleBefore.y) * multiplier;
+	owner->punchangle.z = punchAngleBefore.z + (owner->punchangle.z - punchAngleBefore.z) * multiplier;
 }
 
 Vector& HookFireBullets3(IReGameHook_CBaseEntity_FireBullets3* chain, CBaseEntity* pEntity, Vector& vecSrc, Vector& vecDirShooting, float vecSpread, float flDistance, int iPenetration, int iBulletType, int iDamage, float flRangeModifier, entvars_t* pevAttacker, bool bPistol, int shared_rand)

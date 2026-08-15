@@ -79,5 +79,8 @@ Start your server.
       spread_wpn    m249      -1.0       -1.0         0.85         -1.0        -1.0         -1.0
 
       spread_deadCenterFirstShot "1"
+
+      // Percentage of each shot's original recoil to keep. 100 keeps default recoil; 0 removes it.
+      spread_recoilMultiplier "100"
 ```
 </details>

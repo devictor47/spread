@@ -55,6 +55,11 @@ Start-Sleep(1);
 # Copy DLL to path
 Copy-Item  -Path $releaseDLL -Destination $dllPath -Recurse -Force
 
+# Copy plugin configuration
+$configPath = Join-Path -Path $PSScriptRoot -ChildPath "config\spread.cfg"
+$configDestination = Join-Path -Path (Split-Path -Path $dllPath -Parent) -ChildPath "spread.cfg"
+Copy-Item -Path $configPath -Destination $configDestination -Force
+
 # Start HLDS
 Start-Process -FilePath $hldsExecutable -ArgumentList $hldsParam -WorkingDirectory $hldsPath -WindowStyle Minimized
 
