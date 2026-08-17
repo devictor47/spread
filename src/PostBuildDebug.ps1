@@ -12,11 +12,11 @@ if (!(Test-Path($hldsPath)))
 $hldsExecutable = "D:\steamcmd\steamapps\common\Half-Life\hlds.exe";
 
 # Plugin Name
-$pluginName = "spread";
+$pluginName = "weapon_tuning";
 
 # Debug DLL
 $parentPath = Split-Path $PSScriptRoot -Parent
-$debugDLL = Join-Path -Path $parentPath -ChildPath "build\debug\bin\spread_mm.dll"
+$debugDLL = Join-Path -Path $parentPath -ChildPath "build\debug\bin\${pluginName}_mm.dll"
 
 # Test if was build
 if (!(Test-Path($debugDLL)))
@@ -35,7 +35,12 @@ $hldsPort = 27015
 $hldsParam = "-dev -console -game cstrike -port $hldsPort -pingboost 3 -steam -master -secure -bots -timeout 3 +ip $hldsIP +map de_nuke +maxplayers 32 +sys_ticrate 1000 +log on";
 
 # DLL Path
-$dllPath = "$hldsPath\cstrike\addons\spread\$($pluginName)_mm.dll";
+$targetDir = "$hldsPath\cstrike\addons\${pluginName}"
+$dllPath = "${targetDir}\${pluginName}_mm.dll"
+
+# Create directory if needed
+New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+Copy-Item -Path $debugDLL -Destination $dllPath -Force
 
 # Resolve path of debug dll
 $debugDLL = (Resolve-Path($debugDLL)).Path;
@@ -56,8 +61,8 @@ Start-Sleep(1);
 Copy-Item  -Path $debugDLL -Destination $dllPath -Recurse -Force
 
 # Copy plugin configuration
-$configPath = Join-Path -Path $PSScriptRoot -ChildPath "config\spread.cfg"
-$configDestination = Join-Path -Path (Split-Path -Path $dllPath -Parent) -ChildPath "spread.cfg"
+$configPath = Join-Path -Path $PSScriptRoot -ChildPath "config\${pluginName}.cfg"
+$configDestination = Join-Path -Path (Split-Path -Path $dllPath -Parent) -ChildPath "${pluginName}.cfg"
 Copy-Item -Path $configPath -Destination $configDestination -Force
 
 # Start HLDS

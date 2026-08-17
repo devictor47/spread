@@ -8,7 +8,7 @@
 #include "plinfo.h" // plugin_info_t;
 #include "rehlds_api_plugin.h" // ReHLDS setup;
 #include "regame_api_plugin.h" // ReGame_DLL setup;
-#include "spread.h" // This plugin;
+#include "weapon_tuning.h" // This plugin;
 #include "enginecallbacks.h" // Define g_engfuncs; SERVER_PRINT;
 
 #ifdef _WIN32
@@ -26,12 +26,12 @@ gamedll_funcs_t* gpGamedllFuncs; // Definition expected by meta_api.h
 plugin_info_t Plugin_info =
 {
 	META_INTERFACE_VERSION,		// ifvers
-	"Spread Control Plugin",	// name
+	"Weapon Tuning",		// name
 	"1.0",						// version
 	__DATE__,					// date
-	"DevOak",					// author
-	"https://github.com/wizzar/spread",	// url
-	"SPREAD CTRL",				// logtag
+	"VictorOak",				// author
+	"https://github.com/devictor47/spread/",	// url
+	"WEAP TUNING",				// logtag
 	PT_ANYTIME,					// (when) loadable
 	PT_ANYTIME,					// (when) unloadable
 };
@@ -217,12 +217,12 @@ C_DLLEXPORT int GetEntityAPI2_Post(DLL_FUNCTIONS* pFunctionTable, int* interface
 
 void GameInit()
 {
-	if (gSpread.RegisterCvar())
+	if (gWeaponTuning.RegisterCvar())
 	{
 		LOG_CONSOLE(PLID, "CVAR & SERVER COMMAND REGISTERED");
-		LOG_CONSOLE(PLID, "Executing addons/spread/spread.cfg...");
-		char execCfgCmd[] = "exec addons/spread/spread.cfg\n";
-		g_engfuncs.pfnServerCommand(execCfgCmd);
+		// LOG_CONSOLE(PLID, "Executing addons/spread/spread.cfg...");
+		// char execCfgCmd[] = "exec addons/spread/spread.cfg\n";
+		// g_engfuncs.pfnServerCommand(execCfgCmd);
 	}
 	else {
 		LOG_CONSOLE(PLID, "CVAR & SERVER COMMAND FAILED TO REGISTER. HALTING PLUGIN LOAD.");

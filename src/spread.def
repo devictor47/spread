@@ -1,4 +1,4 @@
-LIBRARY spread_mm
+LIBRARY weapon_tuning_mm
 EXPORTS
 	GiveFnptrsToDll @1
 SECTIONS

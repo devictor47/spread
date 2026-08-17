@@ -45,13 +45,13 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <TargetName>spread_mm</TargetName>
+    <TargetName>weapon_tuning_mm</TargetName>
     <GenerateManifest>false</GenerateManifest>
     <OutDir>$(SolutionDir)build\debug\bin\</OutDir>
     <IntDir>$(SolutionDir)build\debug\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <TargetName>spread_mm</TargetName>
+    <TargetName>weapon_tuning_mm</TargetName>
     <GenerateManifest>false</GenerateManifest>
     <OutDir>$(SolutionDir)build\release\bin\</OutDir>
     <IntDir>$(SolutionDir)build\release\obj\</IntDir>
@@ -105,7 +105,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\build.yml" />
-    <None Include="config\spread.cfg" />
+    <None Include="amx\weapon_control_adm.sma" />
+    <None Include="config\weapon_tuning.cfg" />
     <None Include="cpp.hint" />
     <None Include="Makefile" />
     <None Include="MakefileDbg" />
@@ -118,12 +119,12 @@
     <ClCompile Include="meta_api.cpp" />
     <ClCompile Include="regame_api_plugin.cpp" />
     <ClCompile Include="rehlds_api_plugin.cpp" />
-    <ClCompile Include="spread.cpp" />
+    <ClCompile Include="weapon_tuning.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="regame_api_plugin.h" />
     <ClInclude Include="rehlds_api_plugin.h" />
-    <ClInclude Include="spread.h" />
+    <ClInclude Include="weapon_tuning.h" />
     <ClInclude Include="wrapper_meta_api.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

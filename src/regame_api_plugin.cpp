@@ -3,7 +3,7 @@
 #include "regamedll_api.h" // IReGameApi, ReGameFuncs_t, IReGameHookchains;
 #include "gamerules.h" // CGameRules;
 #include "regame_api_plugin.h"// Declaration of extern global vars;
-#include "spread.h" // This plugin;
+#include "weapon_tuning.h" // This plugin;
 #include "vector.h" // Vector;
 
 IReGameApi* g_ReGameApi;
@@ -138,7 +138,7 @@ void HookKickBack(IReGameHook_CBasePlayerWeapon_KickBack* chain, CBasePlayerWeap
 	const Vector punchAngleBefore = owner->punchangle;
 	chain->callNext(pEntity, up_base, lateral_base, up_modifier, lateral_modifier, up_max, lateral_max, direction_change);
 
-	const float multiplier = gSpread.GetRecoilMultiplier();
+	const float multiplier = gWeaponTuning.GetRecoilMultiplier();
 	if (multiplier >= 1.0f)
 		return;
 
@@ -156,7 +156,7 @@ Vector& HookFireBullets3(IReGameHook_CBaseEntity_FireBullets3* chain, CBaseEntit
 	//using std::chrono::milliseconds;
 
 	//auto t1 = high_resolution_clock::now();
-	vecSpread = gSpread.CalcSpread(pEntity, vecSpread);
+	vecSpread = gWeaponTuning.CalcSpread(pEntity, vecSpread);
 	//auto t2 = high_resolution_clock::now();
 
 	//auto ms_int = duration_cast<milliseconds>(t2 - t1);

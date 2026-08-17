@@ -1,8 +1,12 @@
-#include "spread.h"
+#include "weapon_tuning.h"
 #include "regame_api_plugin.h"
 #include "rehlds_api_plugin.h"
+#include <algorithm>
+#include <cerrno>
+#include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <ctime>
 
 #ifndef _WIN32
@@ -11,7 +15,7 @@
 #include <iomanip>
 #endif
 
-CSpread gSpread;
+CWeaponTuning gWeaponTuning;
 
 
 #ifndef DO_DEBUG
@@ -31,7 +35,7 @@ CSpread gSpread;
 #ifdef DO_DEBUG
 
 // Persist these throughout the whole server life to measure statistics.
-int sc_DeadCenter = 0;
+int sc_ZeroSpread = 0;
 int sc_Airborne = 0;
 int sc_StillStanding = 0;
 int sc_StillDucking = 0;
@@ -42,20 +46,20 @@ auto last = std::chrono::steady_clock::now();
 #define DEBUG_CONSOLE(...) LOG_CONSOLE(PLID, __VA_ARGS__)
 #define LOG_FILE(msg) (this->LogToFile(msg))
 
-void CSpread::LogToFile(const std::string& message) {
+void CWeaponTuning::LogToFile(const std::string& message) {
 
 	if (this->m_logFile.is_open())
 		this->m_logFile << message << std::endl;
 }
 
-void CSpread::SetupLog()
+void CWeaponTuning::SetupLog()
 {
 	auto now = std::chrono::system_clock::now();
 	std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
 	std::string nowStr(std::ctime(&now_time_t));
 
-	const std::string dir = "cstrike/addons/spread";
-	const std::string file = dir + "/spread_log.txt";
+	const std::string dir = "cstrike/addons/weapon_tuning";
+	const std::string file = dir + "/weapon_tuning_log.txt";
 
 	if (!this->m_logFile.is_open())
 	{
@@ -64,7 +68,7 @@ void CSpread::SetupLog()
 		// Failed? Try creating directory and reopening.
 		if (!this->m_logFile)
 		{
-			this->m_logFile.open("cstrike/addons/spread_log.txt", std::ios::app);
+			this->m_logFile.open("cstrike/addons/weapon_tuning_log.txt", std::ios::app);
 
 			// Clear stream state before retrying.
 			this->m_logFile.clear();
@@ -74,8 +78,8 @@ void CSpread::SetupLog()
 
 		if (!this->m_logFile)
 		{
-			LOG_ERROR(PLID, "ERROR OPENING SPREAD LOG FILE");
-			LOG_CONSOLE(PLID, "ERROR OPENING SPREAD LOG FILE");
+			LOG_ERROR(PLID, "ERROR OPENING WEAPON TUNING LOG FILE");
+			LOG_CONSOLE(PLID, "ERROR OPENING WEAPON TUNING LOG FILE");
 			return;
 		}
 
@@ -114,20 +118,102 @@ void CSpread::SetupLog()
 #define IS_FIRST_SHOT(pWeapon) \
     ((pWeapon)->m_iShotsFired == 1)
 
-FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer*, bool, float);
+FORCEDINLINE bool ShouldForceZeroSpreadFirstShot(CBasePlayer*, bool, float);
 
-bool CSpread::RegisterCvar()
+namespace
 {
-	char cmd_name[] = "spread_wpn";
+	constexpr float MIN_SPREAD_MULTIPLIER = 0.0f;
+	constexpr float MAX_SPREAD_MULTIPLIER = 100.0f;
+
+	bool ParseSpreadMultiplier(const char* input, float& value)
+	{
+		if (!input || !*input)
+			return false;
+
+		char* end = nullptr;
+		errno = 0;
+		const float parsedValue = std::strtof(input, &end);
+		if (end == input || *end != '\0' || errno == ERANGE || !std::isfinite(parsedValue))
+			return false;
+
+		value = std::max(MIN_SPREAD_MULTIPLIER, std::min(parsedValue, MAX_SPREAD_MULTIPLIER));
+		return true;
+	}
+
+	bool NormalizeWeaponName(const char* input, std::string& weaponName)
+	{
+		if (!input || !*input)
+			return false;
+
+		weaponName = input;
+		std::transform(weaponName.begin(), weaponName.end(), weaponName.begin(), [](unsigned char character) {
+			return static_cast<char>(std::tolower(character));
+		});
+
+		constexpr char WEAPON_PREFIX[] = "weapon_";
+		constexpr size_t PREFIX_LEN = sizeof(WEAPON_PREFIX) - 1;
+
+		if (weaponName.compare(0, PREFIX_LEN, WEAPON_PREFIX) == 0)
+			weaponName.erase(0, PREFIX_LEN);
+
+		struct WeaponName
+		{
+			const char* input;
+			const char* canonical;
+		};
+
+		static const WeaponName supportedWeapons[] =
+		{
+			{ "glock18", "glock18" }, { "glock", "glock18" },
+			{ "usp", "usp" },
+			{ "p228", "p228" },
+			{ "deagle", "deagle" },
+			{ "elite", "elite" },
+			{ "fiveseven", "fiveseven" }, { "fn57", "fiveseven" },
+			{ "awp", "awp" },
+			{ "scout", "scout" },
+			{ "g3sg1", "g3sg1" },
+			{ "sg550", "sg550" },
+			{ "sg55", "sg550" },
+			{ "galil", "galil" },
+			{ "famas", "famas" },
+			{ "ak47", "ak47" },
+			{ "m4a1", "m4a1" },
+			{ "sg552", "sg552" },
+			{ "aug", "aug" },
+			{ "mac10", "mac10" },
+			{ "tmp", "tmp" },
+			{ "mp5navy", "mp5navy" },
+			{ "mp5", "mp5navy" }, { "ump45", "ump45" },
+			{ "p90", "p90" },
+			{ "m249", "m249" }
+		};
+
+		for (const WeaponName& supportedWeapon : supportedWeapons)
+		{
+			if (weaponName == supportedWeapon.input)
+			{
+				weaponName = WEAPON_PREFIX + std::string(supportedWeapon.canonical);
+				return true;
+			}
+		}
+
+		return false;
+	}
+}
+
+bool CWeaponTuning::RegisterCvar()
+{
+	char cmd_name[] = "wt_spread_mm";
 	g_engfuncs.pfnAddServerCommand(cmd_name, this->SetWeapon);
 
-	if (!CVAR_GET_POINTER(m_DeadCenterFirstShotCvar.name))
-		CVAR_REGISTER(&m_DeadCenterFirstShotCvar);
+	if (!CVAR_GET_POINTER(m_ZeroSpreadFirstShot.name))
+		CVAR_REGISTER(&m_ZeroSpreadFirstShot);
 
-	m_pDeadCenterFirstShotCvar = CVAR_GET_POINTER(m_DeadCenterFirstShotCvar.name);
-	if (!m_pDeadCenterFirstShotCvar)
+	m_pZeroSpreadFirstShotCvar = CVAR_GET_POINTER(m_ZeroSpreadFirstShot.name);
+	if (!m_pZeroSpreadFirstShotCvar)
 	{
-		LOG_ERROR(PLID, "Failed to register \"%s\" cvar.", m_DeadCenterFirstShotCvar.name);
+		LOG_ERROR(PLID, "Failed to register \"%s\" cvar.", m_ZeroSpreadFirstShot.name);
 		return false;
 	}
 
@@ -144,7 +230,7 @@ bool CSpread::RegisterCvar()
 	return true;
 }
 
-float CSpread::GetRecoilMultiplier() const
+float CWeaponTuning::GetRecoilMultiplier() const
 {
 	if (!m_pRecoilMultiplierCvar)
 		return 1.0f;
@@ -161,40 +247,49 @@ float CSpread::GetRecoilMultiplier() const
 	return recoilPercent / 100.0f;
 }
 
-void CSpread::SetWeapon()
+void CWeaponTuning::SetWeapon()
 {
-	if (g_engfuncs.pfnCmd_Argc() >= 8)
+	if (g_engfuncs.pfnCmd_Argc() == 8)
 	{
-		std::string weaponName = g_engfuncs.pfnCmd_Argv(1);
-
-		if (weaponName.find("weapon_") == std::string::npos)
+		std::string weaponName;
+		if (!NormalizeWeaponName(g_engfuncs.pfnCmd_Argv(1), weaponName))
 		{
-			weaponName = "weapon_" + weaponName;
+			LOG_CONSOLE(PLID, "Unsupported weapon \"%s\"", g_engfuncs.pfnCmd_Argv(1));
+			return;
 		}
 
-		if (!weaponName.empty())
+		float multipliers[6];
+		for (int index = 0; index < 6; ++index)
 		{
-			auto slot = g_ReGameApi->GetWeaponSlot(weaponName.c_str());
-
-			if (slot &&
-				(slot->slot == PRIMARY_WEAPON_SLOT ||
-				slot->slot == PISTOL_SLOT))
+			if (!ParseSpreadMultiplier(g_engfuncs.pfnCmd_Argv(index + 2), multipliers[index]))
 			{
-				gSpread.AddWeapon(slot->id,
-					std::stof(g_engfuncs.pfnCmd_Argv(2)),  // InAir
-					std::stof(g_engfuncs.pfnCmd_Argv(3)),  // MovingStanding
-					std::stof(g_engfuncs.pfnCmd_Argv(4)),  // MovingDucking
-					std::stof(g_engfuncs.pfnCmd_Argv(5)),  // StandingStill
-					std::stof(g_engfuncs.pfnCmd_Argv(6)),  // DuckingStill
-					std::stof(g_engfuncs.pfnCmd_Argv(7))); // Default
-
-				LOG_CONSOLE(PLID, "Spread control for \"%s\" set successfully", g_engfuncs.pfnCmd_Argv(1));
-			}
-			else
-			{
-				LOG_CONSOLE(PLID, "Unknown weapon \"%s\"", g_engfuncs.pfnCmd_Argv(1));
+				LOG_CONSOLE(PLID, "Invalid spread multiplier \"%s\"", g_engfuncs.pfnCmd_Argv(index + 2));
+				return;
 			}
 		}
+
+		if (!g_ReGameApi)
+		{
+			LOG_ERROR(PLID, "ReGameDLL API is unavailable; cannot configure weapon spread.");
+			return;
+		}
+
+		auto slot = g_ReGameApi->GetWeaponSlot(weaponName.c_str());
+		if (!slot || (slot->slot != PRIMARY_WEAPON_SLOT && slot->slot != PISTOL_SLOT))
+		{
+			LOG_CONSOLE(PLID, "Unsupported weapon \"%s\"", g_engfuncs.pfnCmd_Argv(1));
+			return;
+		}
+
+		gWeaponTuning.AddWeapon(slot->id,
+			multipliers[0], // InAir
+			multipliers[1], // MovingStanding
+			multipliers[2], // MovingDucking
+			multipliers[3], // StandingStill
+			multipliers[4], // DuckingStill
+			multipliers[5]);// Default
+
+		LOG_CONSOLE(PLID, "Spread control for \"%s\" set successfully", g_engfuncs.pfnCmd_Argv(1));
 	}
 	else
 	{
@@ -202,7 +297,7 @@ void CSpread::SetWeapon()
 	}
 }
 
-void CSpread::AddWeapon(int WeaponIndex, float InAir, float MovingStanding, float MovingDucking, float StandingStill, float DuckingStill, float Default)
+void CWeaponTuning::AddWeapon(int WeaponIndex, float InAir, float MovingStanding, float MovingDucking, float StandingStill, float DuckingStill, float Default)
 {
 	if (WeaponIndex >= 0 && WeaponIndex < MAX_WEAPONS) {
 
@@ -219,7 +314,7 @@ void CSpread::AddWeapon(int WeaponIndex, float InAir, float MovingStanding, floa
 	}
 }
 
-float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
+float CWeaponTuning::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 {
 
 #ifdef DO_DEBUG	
@@ -255,7 +350,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 
 			LOG_FILE(oss.str());
 			LOG_FILE("AIRBORNE " + std::to_string(sc_Airborne));
-			LOG_FILE("DEADCENTER " + std::to_string(sc_DeadCenter));
+			LOG_FILE("ZERO SPREAD " + std::to_string(sc_ZeroSpread));
 			LOG_FILE("STILL STANDING " + std::to_string(sc_StillStanding));
 			LOG_FILE("STILL DUCKING " + std::to_string(sc_StillDucking));
 			LOG_FILE("MOVING STANDING " + std::to_string(sc_MovingStanding));
@@ -303,6 +398,8 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 #ifdef DO_DEBUG			
 		sc_Airborne += 1;
 #endif
+		// Since the spread values are clamped in [0, 1],
+		// 1 being default, we ignore if the value is 1.
 		if (weaponCfg.InAir >= 0.0f)
 		{
 			//DEBUG_CONSOLE("[%s] (airborne) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, vecSpread * weaponCfg.InAir);
@@ -311,10 +408,10 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 	}
 	else
 	{
-		if (ShouldForceDeadCenterShot(pPlayer, this->m_pDeadCenterFirstShotCvar && this->m_pDeadCenterFirstShotCvar->value > 0.0f, speed2D))
+		if (ShouldForceZeroSpreadFirstShot(pPlayer, this->m_pZeroSpreadFirstShotCvar && this->m_pZeroSpreadFirstShotCvar->value > 0.0f, speed2D))
 		{
 #ifdef DO_DEBUG
-			sc_DeadCenter += 1;
+			sc_ZeroSpread += 1;
 #endif
 			//DEBUG_CONSOLE("[%s] (first shot dead center) [OLD SP: %f] [NEW SP: %f]", __FUNCTION__, vecSpread, 0.0f);
 			return 0.0f;
@@ -399,7 +496,7 @@ float CSpread::CalcSpread(CBaseEntity* pEntity, float vecSpread)
 	return vecSpread;
 }
 
-FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer* pPlayer, bool firstShotDeadCenter, float speed2D)
+FORCEDINLINE bool ShouldForceZeroSpreadFirstShot(CBasePlayer* pPlayer, bool zeroSpreadFirstShot, float speed2D)
 {
 	// SCOPE WEAPONS CONSIDERATIONS:
 	// AWP, SCOUT
@@ -419,7 +516,7 @@ FORCEDINLINE bool ShouldForceDeadCenterShot(CBasePlayer* pPlayer, bool firstShot
 	//   AUG & SG552 WITH ZOOM      -> dead center on first shot, if cvar set.
 	//   AUG & SG552 WITHOUT ZOOM   -> allow dead center regardless of zooming situation.
 
-	if (!firstShotDeadCenter)
+	if (!zeroSpreadFirstShot)
 		return false;
 
 	CBasePlayerWeapon* pWeapon =

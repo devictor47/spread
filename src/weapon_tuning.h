@@ -16,7 +16,7 @@ typedef struct tagWEAPON_SPREAD_CFG
 
 } WEAPON_SPREAD_CFG;
 
-class CSpread
+class CWeaponTuning
 {
 public:
 	static void SetWeapon();
@@ -28,7 +28,7 @@ public:
 #ifdef DO_DEBUG
 	void SetupLog();
 
-	~CSpread() {
+	~CWeaponTuning() {
 		if (m_logFile.is_open()) {
 			LogToFile("Closing log");
 			m_logFile.close();
@@ -38,9 +38,9 @@ public:
 
 private:
 	WEAPON_SPREAD_CFG m_rgWeaponsCfg[MAX_WEAPONS] = {};
-	cvar_t m_DeadCenterFirstShotCvar = { "spread_deadCenterFirstShot", "0", 0, 0.0f, NULL };
-	cvar_t m_RecoilMultiplierCvar = { "spread_recoilMultiplier", "100", 0, 0.0f, NULL };
-	cvar_t* m_pDeadCenterFirstShotCvar = NULL;
+	cvar_t m_ZeroSpreadFirstShot = { "wt_zeroSpreadFirstShot_mm", "0", 0, 0.0f, NULL };
+	cvar_t m_RecoilMultiplierCvar = { "wt_recoil_mm", "100", 0, 0.0f, NULL };
+	cvar_t* m_pZeroSpreadFirstShotCvar = NULL;
 	cvar_t* m_pRecoilMultiplierCvar = NULL;
 
 #ifdef DO_DEBUG
@@ -49,4 +49,4 @@ private:
 #endif
 };
 
-extern CSpread gSpread;
+extern CWeaponTuning gWeaponTuning;
