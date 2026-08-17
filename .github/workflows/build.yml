@@ -52,8 +52,8 @@ jobs:
           # Open makefile directory
           cd /desktop/src
 
-          mkdir -p build/release/cstrike/addons/spread
-          mkdir -p build/debug/cstrike/addons/spread
+          mkdir -p build/release/cstrike/addons/weapon_tuning
+          mkdir -p build/debug/cstrike/addons/weapon_tuning
           
           echo "Building release..."
 
@@ -65,11 +65,11 @@ jobs:
           # Make debug
           make -f MakefileDbg
 
-          cp release/spread_mm.so build/release/cstrike/addons/spread
-          cp config/spread.cfg build/release/cstrike/addons/spread
+          cp release/spread_mm.so build/release/cstrike/addons/weapon_tuning
+          cp config/spread.cfg build/release/cstrike/addons/weapon_tuning
 
-          cp debug/spread_mm.so build/debug/cstrike/addons/spread
-          cp config/spread.cfg build/debug/cstrike/addons/spread
+          cp debug/spread_mm.so build/debug/cstrike/addons/weapon_tuning
+          cp config/spread.cfg build/debug/cstrike/addons/weapon_tuning
 
       run: docker exec build-container bash -c "$SCRIPT"
 
@@ -97,16 +97,16 @@ jobs:
         msbuild src\Spread.vcxproj -property:configuration=Debug -nologo -verbosity:minimal
 
         # Make publish directory
-        mkdir -p publish\release\cstrike\addons\spread
-        mkdir -p publish\debug\cstrike\addons\spread
+        mkdir -p publish\release\cstrike\addons\weapon_tuning
+        mkdir -p publish\debug\cstrike\addons\weapon_tuning
         dir
 
         # Move released dll to publish
-        copy src\build\release\bin\*.dll publish\release\cstrike\addons\spread -Recurse -Force
-        copy src\config\*.cfg publish\release\cstrike\addons\spread -Recurse -Force
+        copy src\build\release\bin\*.dll publish\release\cstrike\addons\weapon_tuning -Recurse -Force
+        copy src\config\*.cfg publish\release\cstrike\addons\weapon_tuning -Recurse -Force
 
-        copy src\build\debug\bin\*.dll publish\debug\cstrike\addons\spread -Recurse -Force
-        copy src\config\*.cfg publish\debug\cstrike\addons\spread -Recurse -Force
+        copy src\build\debug\bin\*.dll publish\debug\cstrike\addons\weapon_tuning -Recurse -Force
+        copy src\config\*.cfg publish\debug\cstrike\addons\weapon_tuning -Recurse -Force
 
     - name: Deploy artifacts
       uses: actions/upload-artifact@v4
