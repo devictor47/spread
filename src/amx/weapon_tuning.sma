@@ -515,6 +515,12 @@ bool:loadConfig()
 					g_Spread[_:weaponIndex][DuckingStill] = duckingStill;
 					g_Spread[_:weaponIndex][DefaultSpread] = _default;
 
+					server_cmd(
+						"wt_spread_mm %s %.2f %.2f %.2f %.2f %.2f %.2f",
+						g_WeaponNames[_:weaponIndex],
+						inAir, movingStanding, movingDucking,
+						standingStill, duckingStill, _default);
+
 					log_to_file(logFile, "Set wt_spread_mm [%s] to [%.2f] [%.2f] [%.2f] [%.2f] [%.2f] [%.2f]",
 						g_WeaponNames[_:weaponIndex], inAir, movingStanding, movingDucking, standingStill, duckingStill, _default);
 				}
@@ -533,6 +539,8 @@ bool:loadConfig()
 
 	fclose(file);
 
+	server_exec();
+	
 	log_to_file(logFile, "Configuration loading complete.");
 
 	return true;
