@@ -9,6 +9,11 @@ Write-Host "Post-build configuration: $Configuration"
 Write-Host "DLL directory: $DllDirectory"
 Write-Host "DLL name:      $DllName"
 
+if ($env:GITHUB_ACTIONS -eq "true") {
+    Write-Host "Running in GitHub Actions. Skipping HLDS launch."
+    exit 0
+}
+
 if ([string]::IsNullOrWhiteSpace($DllName))
 {
     Write-Error "TargetName/DLL name was not provided."
