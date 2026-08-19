@@ -102,10 +102,12 @@ void CWeaponTuning::SetupLog()
 //#define IS_ON_GROUND(flags) ((flags)&FL_ONGROUND)
 #define IS_AIRBORNE(flags) (!((flags) & FL_ONGROUND))
 
+#define MOVEMENT_BUTTONS  (IN_FORWARD | IN_BACK | IN_MOVELEFT | IN_MOVERIGHT)
+
 // Horizontal movement threshold.
 // 1.0f is usually enough to ignore tiny physics jitter while still
 // detecting real movement immediately.
-#define MOVEMENT_EPSILON 3.0f
+#define MOVEMENT_EPSILON 1.0f
 
 #define HAS_NO_VELOCITY_2D(speed2D) \
     ((speed2D) < MOVEMENT_EPSILON)
@@ -517,6 +519,9 @@ FORCEDINLINE bool ShouldForceZeroSpreadFirstShot(CBasePlayer* pPlayer, bool zero
 	//   AUG & SG552 WITHOUT ZOOM   -> allow dead center regardless of zooming situation.
 
 	if (!zeroSpreadFirstShot)
+		return false;
+
+	if ((pPlayer->pev->button & MOVEMENT_BUTTONS) != 0)
 		return false;
 
 	CBasePlayerWeapon* pWeapon =
