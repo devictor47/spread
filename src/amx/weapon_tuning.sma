@@ -70,8 +70,9 @@ public plugin_init()
 	
 	register_clcmd("amx_recoil", "cmdRecoil", ADMIN_RCON, "- sets the recoil multiplier (0 to 100)");
 	register_clcmd("amx_zerospreadfs", "cmdZeroSpreadFirstShot", ADMIN_RCON, "- sets whether first shot is dead center when not moving (0 or 1)");
-	register_clcmd("amx_spread", "cmdSpread", ADMIN_RCON, "- configure a weapon spread mechanics (<weapon_name> <in_air> <moving_standing> <moving_ducking> <standing_still> <ducking_still> <default>) where each value is a float from 0.0 above, being 1 the default");
+	register_clcmd("amx_spread", "cmdSpread", ADMIN_RCON, "- <weapon_name> <in_air> <moving_standing> <moving_ducking> <standing_still> <ducking_still> <default> where each value is a float from 0.0 above, being 1 the default");
 	register_clcmd("say /recoil", "getRecoil", ADMIN_ALL, "- displays current recoil multiplier & dead center shot status");
+	register_clcmd("say_team /recoil", "getRecoil", ADMIN_ALL, "- displays current recoil multiplier & dead center shot status");
 
 	g_zeroSpreadFirstShotCvar = get_cvar_pointer("wt_zeroSpreadFirstShot_mm");
 	g_RecoilCvar = get_cvar_pointer("wt_recoil_mm");
@@ -90,12 +91,6 @@ public plugin_init()
 	loadConfig();	
 }
 
-public plugin_cfg()
-{
-	// Load config.
-	//AutoExecConfig(false, "weapon_control");
-}
-
 public plugin_end()
 {
 	// Probably not gonna be used.
@@ -103,8 +98,10 @@ public plugin_end()
 
 public cmdZeroSpreadFirstShot(id, level, cmdId)
 {
-	if (cmd_access(id, level, cmdId, 2) != 1)
+	if (cmd_access(id, level, cmdId, 2) != 1) {
+		console_print(id, "ZERO SPREAD FIRST SHOT IS %d", get_pcvar_num(g_zeroSpreadFirstShotCvar));
 		return PLUGIN_HANDLED;
+	}
 
 	new multiplier[2];
 	read_argv(1, multiplier, charsmax(multiplier));
@@ -128,8 +125,10 @@ public cmdZeroSpreadFirstShot(id, level, cmdId)
 
 public cmdRecoil(id, level, cmdId)
 {
-	if (cmd_access(id, level, cmdId, 2) != 1)
+	if (cmd_access(id, level, cmdId, 2) != 1) {
+		console_print(id, "RECOIL IS %d", get_pcvar_num(g_RecoilCvar));
 		return PLUGIN_HANDLED;
+	}
 
 	new multiplier[4];
 	read_argv(1, multiplier, charsmax(multiplier));
@@ -152,8 +151,33 @@ public cmdRecoil(id, level, cmdId)
 
 public cmdSpread(id, level, cmdId)
 {
-	if (!cmd_access(id, level, cmdId, 8))
+	if (!cmd_access(id, level, cmdId, 2))
 		return PLUGIN_HANDLED;
+
+	if (read_argc() == 2) {
+
+		// Return current values.
+
+		new i = 0;
+		new weaponName[16];
+		read_argv(1, weaponName, charsmax(weaponName));
+		
+		for (; i < sizeof(g_WeaponNames); ++i)
+		{
+			if (equali(weaponName, g_WeaponNames[i]))
+				break;
+		}
+
+		if (i == sizeof(g_WeaponNames)) {
+			console_print(id, "ARMA INVALIDA");
+			return PLUGIN_HANDLED;
+		}
+
+		console_print(id, "SPREAD ATUAL %s: %.2f %.2f %.2f %.2f %.2f %.2f", g_WeaponNames[i], g_Spread[i][InAir], g_Spread[i][MovingStanding], g_Spread[i][MovingDucking],
+			g_Spread[i][StandingStill], g_Spread[i][DuckingStill], g_Spread[i][DefaultSpread]);
+
+		return PLUGIN_HANDLED;
+	}
 
 	new name[32];
 	get_user_name(id, name, charsmax(name));
@@ -307,17 +331,17 @@ saveConfig()
 		"// Usage: wt_spread_mm <weapon_name> <in_air> <moving_standing> <moving_ducking> <standing_still> <ducking_still> <default>",
 		"// Example: wt_spread_mm ak47 -1.0 -1.0 0.8 0.75 0.70 -1.0",
 		"//",
-		"//     COMMAND   |   WEAPON    |  IN   |  MOVING &  |  MOVING &  |  STANDING  |  DUCKING  |  DEFAULT  |",
-		"//               |             |  AIR  |  STANDING  |  DUCKING   |   STILL    |   STILL   |           |",
+		"//     COMMAND     |    WEAPON    |   IN    |  MOVING &  |  MOVING &  |  STANDING  |  DUCKING  |  DEFAULT  |",
+		"//                 |              |   AIR   |  STANDING  |  DUCKING   |   STILL    |   STILL   |           |",
 		"//",
 	};
 
-	static const path[] = "/plugins/weapon_control.cfg";
+	static const path[] = "/plugins/weapon_tuning.cfg";
 
 	new configsDir[128];
 	new dirLen = get_configsdir(configsDir, charsmax(configsDir));
 
-	// addons/amxmodx/configs/plugins/weapon_control.cfg.
+	// addons/amxmodx/configs/plugins/weapon_tuning.cfg.
 	formatex(configsDir[dirLen], charsmax(configsDir) - dirLen, "%s", path);
 
 	// log_amx("%s", path);
@@ -364,7 +388,7 @@ saveConfig()
 			}
 		}
 
-		fprintf(file, "     wt_spread_mm     %-10s    %.2f      %.2f         %.2f         %.2f         %.2f        %.2f^n",
+		fprintf(file, "     wt_spread_mm      %-10s    %.2f        %.2f         %.2f         %.2f         %.2f        %.2f^n",
 			g_WeaponNames[i], g_Spread[i][InAir], g_Spread[i][MovingStanding], g_Spread[i][MovingDucking],
 			g_Spread[i][StandingStill], g_Spread[i][DuckingStill], g_Spread[i][DefaultSpread]);
 
@@ -387,12 +411,12 @@ saveConfig()
 
 bool:loadConfig()
 {
-	static path[] = "/plugins/weapon_control.cfg";
+	static path[] = "/plugins/weapon_tuning.cfg";
 
 	new configsDir[128];
 	new dirLen = get_configsdir(configsDir, charsmax(configsDir));
 
-	// addons/amxmodx/configs/plugins/weapon_control.cfg.
+	// addons/amxmodx/configs/plugins/weapon_tuning.cfg.
 	formatex(configsDir[dirLen], charsmax(configsDir) - dirLen, "%s", path);
 
 	log_to_file(logFile, "Opening config file at %s", configsDir);

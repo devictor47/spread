@@ -76,7 +76,7 @@
       <ModuleDefinitionFile>spread.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>Powershell.exe -ExecutionPolicy Unrestricted -file "$(ProjectDir)PostBuildDebug.ps1"</Command>
+      <Command>powershell.exe -ExecutionPolicy Unrestricted -Command "&amp; '$(ProjectDir)PostBuild.ps1' -Configuration '$(Configuration)' -DllDirectory '$(OutDir)' -DllName '$(TargetName)'"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -100,18 +100,17 @@
       <GenerateMapFile>false</GenerateMapFile>
     </Link>
     <PostBuildEvent>
-      <Command>Powershell.exe -ExecutionPolicy Unrestricted -file "$(ProjectDir)PostBuildRelease.ps1"</Command>
+      <Command>powershell.exe -ExecutionPolicy Unrestricted -Command "&amp; '$(ProjectDir)PostBuild.ps1' -Configuration '$(Configuration)' -DllDirectory '$(OutDir)' -DllName '$(TargetName)'"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\build.yml" />
-    <None Include="amx\weapon_control_adm.sma" />
+    <None Include="amx\weapon_tuning.sma" />
     <None Include="config\weapon_tuning.cfg" />
     <None Include="cpp.hint" />
     <None Include="Makefile" />
     <None Include="MakefileDbg" />
-    <None Include="PostBuildDebug.ps1" />
-    <None Include="PostBuildRelease.ps1" />
+    <None Include="PostBuild.ps1" />
     <None Include="spread.def" />
   </ItemGroup>
   <ItemGroup>
